@@ -31,7 +31,6 @@
 // Tudomasul veszem, hogy a forrasmegjeloles kotelmenek megsertese eseten a hazifeladatra adhato pontokat
 // negativ elojellel szamoljak el es ezzel parhuzamosan eljaras is indul velem szemben.
 //=============================================================================================
-#include <iostream>
 #include "framework.h"
 
 float rnd() { return (float)rand() / RAND_MAX; }
@@ -78,8 +77,8 @@ struct Camera { // 3D camera
 public:
 	Camera() {
 		asp = (float)windowWidth / windowHeight;
-		fov = 75.0f * (float)M_PI / 180.0f;
-		fp = 1; bp = 20; //frontpane, backpane
+		fov = 90.0f * (float)M_PI / 180.0f;
+		fp = 0.1f; bp = 50; //frontpane, backpane
 	}
 	mat4 V() { // view matrix: translates the center to the origin
 		vec3 w = normalize(wEye - wLookat);
@@ -450,16 +449,11 @@ public:
             float x = (float)points[i].x;
             float y = (float)points[i].y;
             float z = (float)points[i].z;
-            std::cout << normal.x << " " << normal.y << " " << normal.z << std::endl;
             vtxData.push_back(GenVertexData(x,y,z,normal));
         }
         normal = cross(side(points[vtxnum-3], points[vtxnum-2]), side(points[vtxnum-2], points[vtxnum-1]));
         vtxData.push_back(GenVertexData((float)points[vtxnum-2].x, (float)points[vtxnum-2].y, (float)points[vtxnum-2].z,normal));
         vtxData.push_back(GenVertexData((float)points[vtxnum-1].x, (float)points[vtxnum-1].y, (float)points[vtxnum-1].z,normal));
-        //normal = cross(points[vtxnum], points[0]);
-        //std::cout << normal.x << " " << normal.y << " " << normal.z << std::endl;
-        //vtxData.push_back(GenVertexData((float)points[0].x, (float)points[0].y, (float)points[0].z,normal));
-        std::cout << "---------" << std::endl;
 
         glBufferData(GL_ARRAY_BUFFER, vtxnum * sizeof(VertexData), &vtxData[0], GL_STATIC_DRAW);
         // Enable the vertex attribute arrays
