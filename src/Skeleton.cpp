@@ -566,6 +566,7 @@ public:
 
 class Track {
     std::vector<Object*> tracks;
+    float v;
     float r;
     float w;
     float k;
@@ -581,6 +582,7 @@ public:
         w=xoffset;
         k = r * 2 * M_PI + 2 * 3 * r;
         loffset = 0;
+        v=0;
 
         material1 = new Material;
         material1->kd = vec3(198.0f/255, 198.0f/255, 198.0f/255);
@@ -599,9 +601,9 @@ public:
         }
     }
 
-    void moveTrack(float amount){
+    void moveTrack(float dt){
         int i = 0;
-        loffset += amount;
+        loffset += v*dt;
         if(loffset>=k) loffset = 0;
         if(loffset<0) loffset = k;
         for (float l=0; l<k; l+=(k/30)){
@@ -665,6 +667,10 @@ public:
     void Draw(RenderState state){
         for (Object * track : tracks) track->Draw(state);
     }
+
+    void changeVelocity(float v){
+        this->v+=v;
+    }
 };
 
 class Tank {
@@ -679,9 +685,13 @@ public:
         for (Track * track : tracks) track->Draw(state);
     }
 
-    void moveTank(float amount){
-        tracks[0]->moveTrack(amount);
-        tracks[1]->moveTrack(amount);
+    void moveTank(float dt){
+        tracks[0]->moveTrack(dt);
+        tracks[1]->moveTrack(dt);
+    }
+
+    void changeTrackspeed(float v, int trackid){
+        tracks[trackid]->changeVelocity(v);
     }
 };
 
@@ -740,11 +750,13 @@ public:
             objects.push_back(pyramidobj);
         }
 
-/*		Object * triangleobj = new Object(phongShader, material0, texture4x8, triangle);
-		triangleobj->translation = vec3(0, 3, 0);
-		triangleobj->scale = vec3(0.7f, 0.7f, 0.7f);
-		triangleobj->rotationAxis = vec3(1, 0, 0);
-		objects.push_back(triangleobj);*/
+        /*Object * squareobj = new Object(phongShader, material1, square);
+        squareobj->translation = vec3(0, 0.1f, -4);
+        squareobj->scale = vec3(200.0f, 1.0f, 1.0f);
+        squareobj->rotationAxis = vec3(1, 0, 0);
+        squareobj->rotationAngle = 90.0f * M_PI / 180;
+        objects.push_back(squareobj);*/
+
 
 		// Camera
 		camera.wEye = vec3(0, 1, 2);
@@ -795,8 +807,12 @@ public:
         camera.wEye = camera.wEye + dir;
     }
 
-    void moveTank(float tstart, float tend, float v){
-        tank->moveTank((tend-tstart)*v);
+    void moveTank(float tstart, float tend){
+        tank->moveTank((tend-tstart));
+    }
+
+    Tank* getTank(){
+        return tank;
     }
 };
 
@@ -820,7 +836,23 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-
+    Tank* tank = scene.getTank();
+    switch(key){
+        case 'q':
+            tank->changeTrackspeed(0.1,1);
+            break;
+        case 'a':
+            tank->changeTrackspeed(-0.1,1);
+            break;
+        case 'o':
+            tank->changeTrackspeed(0.1,0);
+            break;
+        case 'l':
+            tank->changeTrackspeed(-0.1,0);
+            break;
+        default:
+            break;
+    }
 }
 
 // Key of ASCII code released
@@ -844,7 +876,7 @@ void onIdle() {
 		float Dt = fmin(dt, tend - t);
 		//scene.Animate(t, t + Dt);
         scene.move(t, t+Dt, vec3(0,0,0.5f));
-        scene.moveTank(tstart, t+Dt, 0.5f);
+        scene.moveTank(tstart, t+Dt);
 	}
 	glutPostRedisplay();
 }
