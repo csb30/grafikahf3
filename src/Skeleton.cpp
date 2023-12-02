@@ -532,23 +532,37 @@ struct Object {
 	Geometry * geometry;
 	vec3 scale, translation, rotationAxis;
 	float rotationAngle;
+    mat4 M;
+    mat4 Minv;
+    mat4 M2;
+    mat4 Minv2;
 public:
 	Object(Shader * _shader, Material * _material, Geometry * _geometry) :
 		scale(vec3(1, 1, 1)), translation(vec3(0, 0, 0)), rotationAxis(0, 0, 1), rotationAngle(0) {
 		shader = _shader;
 		material = _material;
 		geometry = _geometry;
+        M2=Minv2={vec4(1,0,0,0),
+            vec4(0,1,0,0),
+            vec4(0,0,1,0),
+            vec4(0,0,0,1)};
 	}
 
 
-	virtual void SetModelingTransform(mat4& M, mat4& Minv) {
+	virtual void SetModelingTransform() {
 		M = ScaleMatrix(scale) * RotationMatrix(rotationAngle, rotationAxis) * TranslateMatrix(translation);
 		Minv = TranslateMatrix(-translation) * RotationMatrix(-rotationAngle, rotationAxis) * ScaleMatrix(vec3(1 / scale.x, 1 / scale.y, 1 / scale.z));
+        M = M*M2;
+        Minv = Minv * M2;
 	}
 
+    void ModifyModelTransform(mat4 M, mat4 Minv){
+        M2=M;
+        Minv2=Minv;
+    }
+
 	void Draw(RenderState state) {
-		mat4 M, Minv;
-		SetModelingTransform(M, Minv);
+		SetModelingTransform();
 		state.M = M;
 		state.Minv = Minv;
 		state.MVP = state.M * state.V * state.P;
@@ -566,11 +580,12 @@ public:
 
 class Track {
     std::vector<Object*> tracks;
-    float v;
-    float r;
-    float w;
-    float k;
-    float loffset;
+    float v; //veolcity
+    float r; //sugar
+    float w; //width
+    float k; //kerulet
+    float loffset; //hol tartunk az animacioban
+    float p; //pos
     Material * material1;
     Shader * phongShader;
     Geometry * square;
@@ -583,6 +598,7 @@ public:
         k = r * 2 * M_PI + 2 * 3 * r;
         loffset = 0;
         v=0;
+        p=0;
 
         material1 = new Material;
         material1->kd = vec3(198.0f/255, 198.0f/255, 198.0f/255);
@@ -601,7 +617,7 @@ public:
         }
     }
 
-    void moveTrack(float dt){
+    void moveTrack(float dt, mat4& M, mat4& Minv){
         int i = 0;
         loffset += v*dt;
         if(loffset>=k) loffset = 0;
@@ -614,6 +630,7 @@ public:
                 tracks[i]->translation = genpos(l+loffset-k);
                 tracks[i]->rotationAngle = 90.0f * M_PI / 180 + genangle(l+loffset-k);
             }
+            tracks[i]->ModifyModelTransform(M, Minv);
             i++;
         }
     }
@@ -623,27 +640,27 @@ public:
             float z = l;
             float x = w/2;
             float y = 0;
-            return vec3(x, y+0.1f, z);
+            return vec3(x, y+0.1f, z-0.327552f);
         }
         else if(l<(3*r + M_PI*r)){
             float dl = l-3*r;
             float z = -r*sin(dl/r);
             float x = w/2;
             float y = 2*r-r*(1-cos(dl/r));
-            return vec3(x,y+0.1f,z);
+            return vec3(x,y+0.1f,z-0.327552f);
         }
         else if(l<(3*r + M_PI*r + 3*r)){
             l-=(3*r + M_PI*r);
             float z = (3*r)-l;
             float x = w/2;
             float y = 2*r;
-            return vec3(x, y+0.1f, z);
+            return vec3(x, y+0.1f, z-0.327552f);
         } else {
             float dl = l-3*r;
             float z = r*sin(dl/r) + 3*r;
             float x = w/2;
             float y = r*(1-cos(dl/r));
-            return vec3(x,y+0.1f,z);
+            return vec3(x,y+0.1f,z-0.327552f);
         }
     }
 
@@ -671,14 +688,36 @@ public:
     void changeVelocity(float v){
         this->v+=v;
     }
+
+    float getVelocity(){
+        return v;
+    }
 };
 
 class Tank {
     Track* tracks[2];
+    vec3 h; // heading
+    vec3 p; //pos
+    float alpha;
+    float omega;
+    float w;
+    mat4 M;
+    mat4 Minv;
 public:
     Tank(float width, float height){
         tracks[0] = new Track(0.3f, height,width);
         tracks[1] = new Track(0.3f, height,-width);
+        alpha = 0;
+        h=vec3(cos(alpha), sin(alpha), 0);
+        p=vec3(0,0,0);
+        omega=0;
+        w=width;
+    }
+
+    void SetModelingTransform() {
+        vec3 scale=vec3(1,1,1);
+        M = ScaleMatrix(scale) * RotationMatrix(alpha, vec3(0,1,0)) * TranslateMatrix(p);
+        Minv = TranslateMatrix(-p) * RotationMatrix(-alpha, vec3(0,1,0)) * ScaleMatrix(vec3(1 / scale.x, 1 / scale.y, 1 / scale.z));
     }
 
     void Draw(RenderState state){
@@ -686,12 +725,25 @@ public:
     }
 
     void moveTank(float dt){
-        tracks[0]->moveTrack(dt);
-        tracks[1]->moveTrack(dt);
+        alpha -= omega * dt;
+        h = vec3(-sin(alpha), 0, -cos(alpha));
+        p = p + h * ((tracks[0]->getVelocity() + tracks[1]->getVelocity())/2) * dt;
+        SetModelingTransform();
+        tracks[0]->moveTrack(dt, M, Minv);
+        tracks[1]->moveTrack(dt, M, Minv);
+    }
+
+    vec3 getPos(){
+        return p;
+    }
+
+    vec3 getHeading(){
+        return h;
     }
 
     void changeTrackspeed(float v, int trackid){
         tracks[trackid]->changeVelocity(v);
+        omega = (tracks[1]->getVelocity() - tracks[0]->getVelocity())/w;
     }
 };
 
@@ -803,12 +855,15 @@ public:
         for (Object * obj : objects) obj->move(tstart, tend, dir);
     }
 
-    void movecam(vec3 dir){
-        camera.wEye = camera.wEye + dir;
+    void setCamPos(vec3 pos, vec3 heading){
+        camera.wEye = pos - heading + vec3(0,1,0);
+        camera.wLookat = pos + heading;
     }
 
     void moveTank(float tstart, float tend){
         tank->moveTank((tend-tstart));
+        setCamPos(tank->getPos(), tank->getHeading());
+        std::cout << tank->getHeading().x << std::endl;
     }
 
     Tank* getTank(){
@@ -875,7 +930,7 @@ void onIdle() {
 	for (float t = tstart; t < tend; t += dt) {
 		float Dt = fmin(dt, tend - t);
 		//scene.Animate(t, t + Dt);
-        scene.move(t, t+Dt, vec3(0,0,0.5f));
+        //scene.move(t, t+Dt, vec3(0,0,0.5f));
         scene.moveTank(tstart, t+Dt);
 	}
 	glutPostRedisplay();
