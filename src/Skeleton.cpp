@@ -669,6 +669,7 @@ public:
 
 class Tank {
     Track* tracks[2];
+public:
     Tank(float width, float height){
         tracks[0] = new Track(0.3f, height,width);
         tracks[1] = new Track(0.3f, height,-width);
@@ -676,6 +677,11 @@ class Tank {
 
     void Draw(RenderState state){
         for (Track * track : tracks) track->Draw(state);
+    }
+
+    void moveTank(float amount){
+        tracks[0]->moveTrack(amount);
+        tracks[1]->moveTrack(amount);
     }
 };
 
@@ -686,7 +692,7 @@ class Scene {
 	Camera camera; // 3D camera
 	std::vector<Light> lights;
     Object * floorobj;
-    Track * track;
+    Tank * tank;
 public:
 	void Build() {
 		// Shaders
@@ -717,11 +723,15 @@ public:
         floorobj->rotationAxis = vec3(1, 0, 0);
         floorobj->rotationAngle = 90.0f * M_PI / 180;
 
-        track = new Track(0.3f, 0.4f,0.5f);
+        tank = new Tank(0.75f, 0.4f);
 
         for(int i=0; i<100; i++){
             float x = 200*rnd()-100;
             float z = 200*rnd()-100;
+            while ((x>-10 and x<10) or (z>-10 and z<10)){
+                x = 200*rnd()-100;
+                z = 200*rnd()-100;
+            }
 
             Object * pyramidobj = new Object(phongShader, material1, pyramid);
             pyramidobj->translation = vec3(x, 0, z);
@@ -768,7 +778,7 @@ public:
 		state.P = camera.P();
 		state.lights = lights;
         floorobj->Draw(state);
-        track->Draw(state);
+        tank->Draw(state);
 		for (Object * obj : objects) obj->Draw(state);
 	}
 
@@ -785,8 +795,8 @@ public:
         camera.wEye = camera.wEye + dir;
     }
 
-    void moveTrack(float tstart, float tend, float v){
-        track->moveTrack((tend-tstart)*v);
+    void moveTank(float tstart, float tend, float v){
+        tank->moveTank((tend-tstart)*v);
     }
 };
 
@@ -834,7 +844,7 @@ void onIdle() {
 		float Dt = fmin(dt, tend - t);
 		//scene.Animate(t, t + Dt);
         scene.move(t, t+Dt, vec3(0,0,1));
-        scene.moveTrack(tstart, t+Dt, 0.1f);
+        scene.moveTank(tstart, t+Dt, 0.1f);
 	}
 	glutPostRedisplay();
 }
