@@ -31,7 +31,6 @@
 // Tudomasul veszem, hogy a forrasmegjeloles kotelmenek megsertese eseten a hazifeladatra adhato pontokat
 // negativ elojellel szamoljak el es ezzel parhuzamosan eljaras is indul velem szemben.
 //=============================================================================================
-#include <iostream>
 #include "framework.h"
 
 float rnd() { return (float)rand() / RAND_MAX; }
@@ -67,8 +66,6 @@ template<class T> Dnum<T> Pow(Dnum<T> g, float n) {
 }
 
 typedef Dnum<vec2> Dnum2;
-
-const int tessellationLevel = 20;
 
 //---------------------------
 struct Camera { // 3D camera
@@ -320,168 +317,6 @@ public:
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, vtxnum+1);
     }
-};
-
-//---------------------------
-class ParamSurface : public Geometry {
-//---------------------------
-	struct VertexData {
-		vec3 position, normal;
-		vec2 texcoord;
-	};
-
-	unsigned int nVtxPerStrip, nStrips;
-public:
-	ParamSurface() { nVtxPerStrip = nStrips = 0; }
-
-	virtual void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) = 0;
-
-	VertexData GenVertexData(float u, float v) {
-		VertexData vtxData;
-		vtxData.texcoord = vec2(u, v);
-		Dnum2 X, Y, Z;
-		Dnum2 U(u, vec2(1, 0)), V(v, vec2(0, 1));
-		eval(U, V, X, Y, Z);
-		vtxData.position = vec3(X.f, Y.f, Z.f);
-		vec3 drdU(X.d.x, Y.d.x, Z.d.x), drdV(X.d.y, Y.d.y, Z.d.y);
-		vtxData.normal = cross(drdU, drdV);
-		return vtxData;
-	}
-
-	void create(int N = tessellationLevel, int M = tessellationLevel) {
-		nVtxPerStrip = (M + 1) * 2;
-		nStrips = N;
-		std::vector<VertexData> vtxData;	// vertices on the CPU
-		for (int i = 0; i < N; i++) {
-			for (int j = 0; j <= M; j++) {
-				vtxData.push_back(GenVertexData((float)j / M, (float)i / N));
-				vtxData.push_back(GenVertexData((float)j / M, (float)(i + 1) / N));
-			}
-		}
-		glBufferData(GL_ARRAY_BUFFER, nVtxPerStrip * nStrips * sizeof(VertexData), &vtxData[0], GL_STATIC_DRAW);
-		// Enable the vertex attribute arrays
-		glEnableVertexAttribArray(0);  // attribute array 0 = POSITION
-		glEnableVertexAttribArray(1);  // attribute array 1 = NORMAL
-		glEnableVertexAttribArray(2);  // attribute array 2 = TEXCOORD0
-		// attribute array, components/attribute, component type, normalize?, stride, offset
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, position));
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, normal));
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, texcoord));
-	}
-
-	void Draw() {
-		glBindVertexArray(vao);
-		for (unsigned int i = 0; i < nStrips; i++) glDrawArrays(GL_TRIANGLE_STRIP, i *  nVtxPerStrip, nVtxPerStrip);
-	}
-};
-
-//---------------------------
-class Sphere : public ParamSurface {
-//---------------------------
-public:
-	Sphere() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = U * 2.0f * (float)M_PI, V = V * (float)M_PI;
-		X = Cos(U) * Sin(V); Y = Sin(U) * Sin(V); Z = Cos(V);
-	}
-};
-
-//---------------------------
-class Tractricoid : public ParamSurface {
-//---------------------------
-public:
-	Tractricoid() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		const float height = 3.0f;
-		U = U * height, V = V * 2 * M_PI;
-		X = Cos(V) / Cosh(U); Y = Sin(V) / Cosh(U); Z = U - Tanh(U);
-	}
-};
-
-//---------------------------
-class Cylinder : public ParamSurface {
-//---------------------------
-public:
-	Cylinder() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = U * 2.0f * M_PI, V = V * 2 - 1.0f;
-		X = Cos(U); Y = Sin(U); Z = V;
-	}
-};
-
-//---------------------------
-class Torus : public ParamSurface {
-//---------------------------
-public:
-	Torus() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		const float R = 1, r = 0.5f;
-		U = U * 2.0f * M_PI, V = V * 2.0f * M_PI;
-		Dnum2 D = Cos(U) * r + R;
-		X = D * Cos(V); Y = D * Sin(V); Z = Sin(U) * r;
-	}
-};
-
-//---------------------------
-class Mobius : public ParamSurface {
-//---------------------------
-public:
-	Mobius() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		const float R = 1, width = 0.5f;
-		U = U * M_PI, V = (V - 0.5f) * width;
-		X = (Cos(U) * V + R) * Cos(U * 2);
-		Y = (Cos(U) * V + R) * Sin(U * 2);
-		Z = Sin(U) * V;
-	}
-};
-
-//---------------------------
-class Klein : public ParamSurface {
-//---------------------------
-	const float size = 1.5f;
-public:
-	Klein() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = U * M_PI * 2, V = V * M_PI * 2;
-		Dnum2 a = Cos(U) * (Sin(U) + 1) * 0.3f;
-		Dnum2 b = Sin(U) * 0.8f;
-		Dnum2 c = (Cos(U) * (-0.1f) + 0.2f);
-		X = a + c * ((U.f > M_PI) ? Cos(V + M_PI) : Cos(U) * Cos(V));
-		Y = b + ((U.f > M_PI) ? 0 : c * Sin(U) * Cos(V));
-		Z = c * Sin(V);
-	}
-};
-
-//---------------------------
-class Boy : public ParamSurface {
-//---------------------------
-public:
-	Boy() { create(); }
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = (U - 0.5f) * M_PI, V = V * M_PI;
-		float r2 = sqrt(2.0f);
-		Dnum2 denom = (Sin(U * 3)*Sin(V * 2)*(-3 / r2) + 3) * 1.2f;
-		Dnum2 CosV2 = Cos(V) * Cos(V);
-		X = (Cos(U * 2) * CosV2 * r2 + Cos(U) * Sin(V * 2)) / denom;
-		Y = (Sin(U * 2) * CosV2 * r2 - Sin(U) * Sin(V * 2)) / denom;
-		Z = (CosV2 * 3) / denom;
-	}
-};
-
-//---------------------------
-class Dini : public ParamSurface {
-//---------------------------
-	Dnum2 a = 1.0f, b = 0.15f;
-public:
-	Dini() { create(); }
-
-	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
-		U = U * 4 * M_PI, V = V * (1 - 0.1f) + 0.1f;
-		X = a * Cos(U) * Sin(V);
-		Y = a * Sin(U) * Sin(V);
-		Z = a * (Cos(V) + Log(Tan(V / 2))) + b * U + 3;
-	}
 };
 
 class Square : public FlatSurface {
@@ -802,13 +637,6 @@ public:
             objects.push_back(pyramidobj);
         }
 
-        /*Object * squareobj = new Object(phongShader, material1, square);
-        squareobj->translation = vec3(0, 0.1f, -4);
-        squareobj->scale = vec3(200.0f, 1.0f, 1.0f);
-        squareobj->rotationAxis = vec3(1, 0, 0);
-        squareobj->rotationAngle = 90.0f * M_PI / 180;
-        objects.push_back(squareobj);*/
-
 
 		// Camera
 		camera.wEye = vec3(0, 1, 2);
@@ -819,20 +647,6 @@ public:
         lights[0].wLightPos = vec4(5, 5, 0, 0);	// ideal point -> directional light source
         lights[0].La = vec3(1, 1, 1);
         lights[0].Le = vec3(1, 1, 1);
-
-		/*// Lights
-		lights.resize(3);
-		lights[0].wLightPos = vec4(5, 5, 4, 0);	// ideal point -> directional light source
-		lights[0].La = vec3(0.1f, 0.1f, 1);
-		lights[0].Le = vec3(3, 0, 0);
-
-		lights[1].wLightPos = vec4(5, 10, 20, 0);	// ideal point -> directional light source
-		lights[1].La = vec3(0.2f, 0.2f, 0.2f);
-		lights[1].Le = vec3(0, 3, 0);
-
-		lights[2].wLightPos = vec4(-5, 5, 5, 0);	// ideal point -> directional light source
-		lights[2].La = vec3(0.1f, 0.1f, 0.1f);
-		lights[2].Le = vec3(0, 0, 3);*/
 	}
 
 	void Render() {
@@ -863,7 +677,6 @@ public:
     void moveTank(float tstart, float tend){
         tank->moveTank((tend-tstart));
         setCamPos(tank->getPos(), tank->getHeading());
-        std::cout << tank->getHeading().x << std::endl;
     }
 
     Tank* getTank(){
@@ -906,6 +719,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
             tank->changeTrackspeed(-0.1,0);
             break;
         default:
+            break;
             break;
     }
 }
