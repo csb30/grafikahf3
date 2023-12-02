@@ -603,6 +603,7 @@ public:
         int i = 0;
         loffset += amount;
         if(loffset>=k) loffset = 0;
+        if(loffset<0) loffset = k;
         for (float l=0; l<k; l+=(k/30)){
             if(l+loffset<k){
                 tracks[i]->translation = genpos(l+loffset);
@@ -626,12 +627,12 @@ public:
             float dl = l-3*r;
             float z = -r*sin(dl/r);
             float x = w/2;
-            float y = r*(1-cos(dl/r));
+            float y = 2*r-r*(1-cos(dl/r));
             return vec3(x,y+0.1f,z);
         }
         else if(l<(3*r + M_PI*r + 3*r)){
             l-=(3*r + M_PI*r);
-            float z = l;
+            float z = (3*r)-l;
             float x = w/2;
             float y = 2*r;
             return vec3(x, y+0.1f, z);
@@ -639,7 +640,7 @@ public:
             float dl = l-3*r;
             float z = r*sin(dl/r) + 3*r;
             float x = w/2;
-            float y = 2*r-r*(1-cos(dl/r));
+            float y = r*(1-cos(dl/r));
             return vec3(x,y+0.1f,z);
         }
     }
@@ -650,19 +651,31 @@ public:
         }
         else if(l<(3*r + M_PI*r)){
             float dl = l-3*r;
-            return dl/r;
+            return -dl/r;
         }
         else if(l<(3*r + M_PI*r + 3*r)){
             return 0;
         }
         else {
             float dl = l-3*r;
-            return dl/r;
+            return -dl/r;
         }
     }
 
     void Draw(RenderState state){
         for (Object * track : tracks) track->Draw(state);
+    }
+};
+
+class Tank {
+    Track* tracks[2];
+    Tank(float width, float height){
+        tracks[0] = new Track(0.3f, height,width);
+        tracks[1] = new Track(0.3f, height,-width);
+    }
+
+    void Draw(RenderState state){
+        for (Track * track : tracks) track->Draw(state);
     }
 };
 
@@ -772,8 +785,8 @@ public:
         camera.wEye = camera.wEye + dir;
     }
 
-    void moveTrack(float tstart, float tend){
-        track->moveTrack((tend-tstart)*0.1f);
+    void moveTrack(float tstart, float tend, float v){
+        track->moveTrack((tend-tstart)*v);
     }
 };
 
@@ -821,7 +834,7 @@ void onIdle() {
 		float Dt = fmin(dt, tend - t);
 		//scene.Animate(t, t + Dt);
         scene.move(t, t+Dt, vec3(0,0,1));
-        scene.moveTrack(tstart, t+Dt);
+        scene.moveTrack(tstart, t+Dt, 0.1f);
 	}
 	glutPostRedisplay();
 }
