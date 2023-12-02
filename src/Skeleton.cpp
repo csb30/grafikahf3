@@ -560,7 +560,7 @@ public:
 	virtual void Animate(float tstart, float tend) { rotationAngle = 0.8f * tend; }
 
     void move(float tstart, float tend, vec3 dir){
-        translation = translation - dir * (tstart-tend);
+        translation = translation + dir * (tend-tstart);
     }
 };
 
@@ -788,7 +788,7 @@ public:
 	}
 
     void move(float tstart, float tend, vec3 dir){
-        //for (Object * obj : objects) obj->move(tstart, tend, dir);
+        for (Object * obj : objects) obj->move(tstart, tend, dir);
     }
 
     void movecam(vec3 dir){
@@ -843,8 +843,8 @@ void onIdle() {
 	for (float t = tstart; t < tend; t += dt) {
 		float Dt = fmin(dt, tend - t);
 		//scene.Animate(t, t + Dt);
-        scene.move(t, t+Dt, vec3(0,0,1));
-        scene.moveTank(tstart, t+Dt, 0.1f);
+        scene.move(t, t+Dt, vec3(0,0,0.5f));
+        scene.moveTank(tstart, t+Dt, 0.5f);
 	}
 	glutPostRedisplay();
 }
